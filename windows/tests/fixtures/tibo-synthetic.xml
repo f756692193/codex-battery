@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>Synthetic test feed - not real announcements</title>
+  <link>https://x.com/thsottiaux</link>
+  <lastBuildDate>Mon, 01 Jan 2024 08:00:00 +0000</lastBuildDate>
+  <item><title>Synthetic card example</title><description><![CDATA[[TEST ONLY] A banked reset is available.]]></description><link>https://x.com/thsottiaux/status/2107913674593644711</link><pubDate>Mon, 01 Jan 2024 08:00:00 +0000</pubDate></item>
+  <item><title>Synthetic reset example</title><description><![CDATA[[TEST ONLY] A global reset is planned.]]></description><link>https://x.com/thsottiaux/status/2107913674593644712</link><pubDate>Sun, 31 Dec 2023 08:00:00 +0000</pubDate></item>
+  <item><title>Wrong author</title><description>reset card</description><link>https://x.com/other/status/2107913674593644713</link><pubDate>Mon, 01 Jan 2024 08:00:00 +0000</pubDate></item>
+</channel></rss>

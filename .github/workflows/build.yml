@@ -1,0 +1,35 @@
+name: Build and test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test and package Windows
+        shell: powershell
+        run: .\scripts\package-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CodexBattery-windows
+          path: artifacts/CodexBattery-windows-*.zip
+          if-no-files-found: error
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test macOS core and fake RPC
+        run: swift test --package-path macos
+      - name: Build universal macOS app
+        run: ARCHS=universal bash macos/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CodexBattery-macos-experimental
+          path: |
+            macos/dist/*.zip
+            macos/dist/SHA256.txt
+          if-no-files-found: error

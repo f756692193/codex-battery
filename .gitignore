@@ -1,0 +1,37 @@
+# Build output and local verification results
+/artifacts/
+windows/dist*/
+windows/obj/
+windows/tests/*.exe
+windows/tests/results*/
+windows/tests/preview*/
+windows/src/app.ico
+macos/.build/
+macos/.swiftpm/
+macos/dist/
+*.zip
+*.dmg
+*.pdb
+*.log
+__pycache__/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Credentials, runtime settings and caches never belong in source control
+.env
+.env.*
+!.env.example
+auth.json
+.codex/
+settings.json
+tibo-news.json
+notifications.txt
+live-verification.json
+ui-smoke.json
+*.pid
+*.p12
+*.pfx
+*.mobileprovision
+*.key
