@@ -49,7 +49,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\tests\run.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1
 ```
 
-测试使用合成账号和 RSS 数据，不要求 Codex 登录，包含 46 项额度 / 进程、35 项消息、16 项界面操作检查。界面检查会短暂显示本工具窗口，设置窗口自动取消，不写入偏好设置。打包脚本生成 `artifacts\CodexBattery-windows-1.0.0.zip`，包含 EXE、使用说明、验证说明和 SHA256。
+测试使用合成账号和 RSS 数据，不要求安装或登录 Codex，包含 48 项额度 / 进程、35 项消息、16 项界面操作检查，共 99 项。模拟 RPC 服务显式使用 UTF-8 读写，并覆盖父进程控制台输入带 UTF-8 BOM 的场景，避免受机器默认编码影响。界面检查会短暂显示本工具窗口，设置窗口自动取消，不写入偏好设置。打包脚本生成 `artifacts\CodexBattery-windows-1.0.0.zip`，包含 EXE、使用说明、验证说明和 SHA256。
 
 手动验证真实账号可运行：
 

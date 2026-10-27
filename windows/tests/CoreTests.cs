@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using CodexQuotaManager;
 
@@ -20,14 +21,20 @@ class CoreTests {
             File.WriteAllText(Path.Combine(folder, "fake-child.pid"), child.Id.ToString());
         }
         int reads = 0; string scenario = Environment.GetEnvironmentVariable("QUOTA_TEST_SCENARIO");
-        string line;
-        while ((line = Console.ReadLine()) != null) {
-            var m = Json.Read(line); var id = Json.Get(m, "id"); if (id == null) continue;
-            string method = Json.Str(m, "method"); object result = new { };
-            if (method == "account/read") { reads++; result = new { account = scenario == "no-login" ? null : new { type = "chatgpt", email = scenario == "switch" && reads > 1 ? "other@example.invalid" : "test@example.invalid", planType = "pro" } }; }
-            if (method == "account/rateLimits/read") result = new { rateLimits = new { primary = Window(25, 300, DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds()) } };
-            if (method == "account/rateLimits/read" && scenario == "hang") Thread.Sleep(60000);
-            Console.WriteLine(Json.Write(new { id = id, result = result })); Console.Out.Flush();
+        // Framework Process.StandardInput follows the parent console encoding and
+        // can emit a UTF-8 BOM on CI. Read the RPC stream as UTF-8, independently
+        // of the fake process's console code page, and consume its optional BOM.
+        using (var input = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false, true), true))
+        using (var output = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true }) {
+            string line;
+            while ((line = input.ReadLine()) != null) {
+                var m = Json.Read(line); var id = Json.Get(m, "id"); if (id == null) continue;
+                string method = Json.Str(m, "method"); object result = new { };
+                if (method == "account/read") { reads++; result = new { account = scenario == "no-login" ? null : new { type = "chatgpt", email = scenario == "switch" && reads > 1 ? "other@example.invalid" : "test@example.invalid", planType = "pro" } }; }
+                if (method == "account/rateLimits/read") result = new { rateLimits = new { primary = Window(25, 300, DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds()) } };
+                if (method == "account/rateLimits/read" && scenario == "hang") Thread.Sleep(60000);
+                output.WriteLine(Json.Write(new { id = id, result = result }));
+            }
         }
         return 0;
     }
@@ -103,6 +110,16 @@ class CoreTests {
             Check(got.Windows.Count == 1 && got.Windows[0].Remaining == 75, "RPC initialize/account/limits round trip");
             int child = int.Parse(File.ReadAllText(Path.Combine(folder, "fake-child.pid")));
             Check(!Alive(client.LastProcessId) && !Alive(child), "job closes helper and descendants");
+            var originalInputEncoding = Console.InputEncoding;
+            try {
+                // Reproduce the UTF-8 preamble emitted by the Framework writer
+                // under the console configuration used by hosted Windows CI.
+                Console.InputEncoding = Encoding.UTF8;
+                got = client.Fetch(exe, CancellationToken.None).GetAwaiter().GetResult();
+                Check(got.Account == "test@example.invalid" && got.Windows.Count == 1 && got.Windows[0].Remaining == 75, "RPC round trip accepts UTF-8 console input with a BOM");
+                child = int.Parse(File.ReadAllText(Path.Combine(folder, "fake-child.pid")));
+                Check(!Alive(client.LastProcessId) && !Alive(child), "UTF-8-console query cleans helper and descendants");
+            } finally { Console.InputEncoding = originalInputEncoding; }
             Environment.SetEnvironmentVariable("QUOTA_TEST_SCENARIO", "switch"); bool switched = false;
             try { client.Fetch(exe, CancellationToken.None).GetAwaiter().GetResult(); } catch (InvalidOperationException) { switched = true; }
             Check(switched, "account change rejects mixed snapshot");

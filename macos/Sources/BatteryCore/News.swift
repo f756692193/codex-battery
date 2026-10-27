@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(FoundationXML)
 import FoundationXML
+#endif
 import CryptoKit
 
 public struct NewsItem: Codable {
