@@ -1,6 +1,6 @@
 # Codex Battery · Codex 额度电量管家
 
-**Windows 当前版本：1.0.0。** 用一个绿色小电池查看 Codex 额度、下次重置时间、可用重置卡及最早到期时间。
+**Windows 当前版本：1.0.2。** 用一个绿色小电池查看 Codex 额度、下次重置时间、可用重置卡及最早到期时间。
 
 ![悬停面板示例](docs/images/windows-hover-demo.png)
 
@@ -20,7 +20,7 @@
 
 需要 Windows 10 / 11 自带的 .NET Framework 4.8，以及已安装、已登录的本机 Codex。查询需要联网，不要求填写密码、验证码或 API Key。
 
-1. 直接运行本项目中的 `windows\dist\CodexQuotaManager.exe`，或解压 `artifacts\CodexBattery-windows-1.0.0.zip` 后双击 EXE。
+1. 直接运行本项目中的 `windows\dist\CodexQuotaManager.exe`，或解压 `artifacts\CodexBattery-windows-1.0.2.zip` 后双击 EXE。
 2. 鼠标放到电池上查看详情；拖动电池改变位置；双击打开完整详情。
 3. 通过悬停面板、浮窗右键或托盘右键进入设置。未找到 Codex 时手动选择 `codex.exe`。
 4. 点击主窗口 X 只是收回托盘；右键托盘选择“退出管家”才会停止运行。
@@ -33,7 +33,7 @@
 
 ```text
 windows/dist/                              当前唯一的 Windows 程序目录
-artifacts/CodexBattery-windows-1.0.0.zip     当前版本的便携包
+artifacts/CodexBattery-windows-1.0.2.zip     当前版本的便携包
 ```
 
 程序目录始终使用 `dist`，更新时覆盖当前产物，不创建 `dist-v*` 目录。打包脚本成功生成新包后会清理旧 Windows ZIP。历史发行包如需保留，应放到仓库 Releases 或内部制品库，本机项目目录只保留最新版。
@@ -47,7 +47,7 @@ artifacts/CodexBattery-windows-1.0.0.zip     当前版本的便携包
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1
 ```
 
-Windows 发布版本统一读取根目录 [VERSION](VERSION)，EXE 版本、主窗口版本、请求标识和 ZIP 文件名自动同步。当前为 **1.0.0**。
+Windows 发布版本统一读取根目录 [VERSION](VERSION)，EXE 版本、主窗口版本、请求标识和 ZIP 文件名自动同步。当前为 **1.0.2**。
 
 | 后续变化 | 版本示例 |
 | --- | --- |
@@ -61,7 +61,7 @@ Windows 发布版本统一读取根目录 [VERSION](VERSION)，EXE 版本、主�
 
 仓库包含 Swift + AppKit 的 **0.1.0 实验源码**、测试和 `.app` 打包脚本，目标 macOS 13+。尚未在 Mac 编译或真机验证，不包含可承诺正常运行的 Mac 正式发行包；重置卡到期行等 Windows 功能尚未全部移植。
 
-Mac 上的构建和验证步骤见 [macOS 说明](macos/README.md)。Windows 的1.0.0发布不代表Mac已正式发布。
+Mac 上的构建和验证步骤见 [macOS 说明](macos/README.md)。Windows 的1.0.2发布不代表Mac已正式发布。
 
 ## 数据与隐私
 

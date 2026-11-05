@@ -302,11 +302,11 @@ namespace CodexQuotaManager {
         readonly HoverDetailsForm details;
         readonly System.Windows.Forms.Timer hoverTimer;
         readonly ContextMenuStrip menu;
-        Point drag; bool moving, dragged, cleaned; readonly Settings settings;
+        Point drag; bool moving, dragged, cleaned; readonly Settings settings; readonly Action saveSettings;
         protected override bool ShowWithoutActivation { get { return true; } }
         protected override CreateParams CreateParams { get { var p = base.CreateParams; p.ExStyle |= 0x08000000 | 0x80; return p; } }
-        public FloatingForm(Settings s, Action open, Action refresh, Action configure, Action exit, Action showNews) {
-            settings = s; Text = "Codex 剩余额度"; FormBorderStyle = FormBorderStyle.None; TopMost = true; ShowInTaskbar = false;
+        public FloatingForm(Settings s, Action open, Action refresh, Action configure, Action exit, Action showNews, Action save) {
+            settings = s; saveSettings = save; Text = "Codex 剩余额度"; FormBorderStyle = FormBorderStyle.None; TopMost = true; ShowInTaskbar = false;
             AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(64, 24); BackColor = Theme.Card; Padding = Padding.Empty;
             label = new BatteryGauge { Dock = DockStyle.Fill, Cursor = Cursors.SizeAll, Text = "—" }; Controls.Add(label);
             details = new HoverDetailsForm(refresh, configure, exit);
@@ -325,14 +325,14 @@ namespace CodexQuotaManager {
             label.MouseMove += delegate(object sender, MouseEventArgs e) {
                 if (moving && (dragged || Math.Abs(e.X - drag.X) + Math.Abs(e.Y - drag.Y) >= 3)) { dragged = true; Location = new Point(Left + e.X - drag.X, Top + e.Y - drag.Y); }
             };
-            label.MouseUp += delegate { moving = false; if (dragged) { settings.FloatX = Left; settings.FloatY = Top; try { settings.Save(); } catch { } } };
+            label.MouseUp += delegate { moving = false; if (dragged) { settings.FloatX = Left; settings.FloatY = Top; saveSettings(); } };
             label.DoubleClick += delegate { details.Hide(); open(); };
             menu = new ContextMenuStrip(); menu.Opening += delegate { details.Hide(); };
             menu.Items.Add("打开额度详情", null, delegate { open(); });
             menu.Items.Add("立即刷新", null, delegate { refresh(); });
             menu.Items.Add("Tibo 重置 / 赠送消息…", null, delegate { showNews(); });
             menu.Items.Add("设置…", null, delegate { configure(); });
-            menu.Items.Add("隐藏小浮窗", null, delegate { Hide(); settings.Floating = false; try { settings.Save(); } catch { } });
+            menu.Items.Add("隐藏小浮窗", null, delegate { Hide(); settings.Floating = false; saveSettings(); });
             menu.Items.Add(new ToolStripSeparator()); menu.Items.Add("退出管家", null, delegate { exit(); }); label.ContextMenuStrip = menu;
             StartPosition = FormStartPosition.Manual;
             var area = Screen.PrimaryScreen.WorkingArea;
@@ -395,12 +395,13 @@ namespace CodexQuotaManager {
     public class SettingsForm : Form {
         const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
         readonly Settings s;
+        readonly bool preview;
         readonly TextBox path, newsFeed;
         readonly NumericUpDown seconds, threshold;
         readonly CheckBox notify, floating, local, number, startup, newsEnabled;
         public static bool StartupEnabled() { using (var k = Registry.CurrentUser.OpenSubKey(RunKey)) return k != null && k.GetValue("CodexQuotaManager") != null; }
-        public SettingsForm(Settings settings, string detected) {
-            s = settings; Text = "设置 · Codex 额度电量管家"; Font = new Font("Microsoft YaHei UI", 10); AutoScaleMode = AutoScaleMode.Dpi;
+        public SettingsForm(Settings settings, string detected, bool previewMode = false) {
+            s = settings; preview = previewMode; Text = "设置 · Codex 额度电量管家"; Font = new Font("Microsoft YaHei UI", 10); AutoScaleMode = AutoScaleMode.Dpi;
             BackColor = Theme.Bg; ForeColor = Theme.Text; FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false; MinimizeBox = false; ShowInTaskbar = false; StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(580, 634);
             var title = Theme.Label("偏好设置", 17, Theme.Text); title.Location = new Point(24, 19); Controls.Add(title);
             var desc = Theme.Label("复用本机 Codex 登录，无需填写密码或 API Key。", 9, Theme.Muted); desc.Location = new Point(25, 61); Controls.Add(desc);
@@ -429,12 +430,12 @@ namespace CodexQuotaManager {
                 string manual = path.Text.Trim().Trim('"'); if (manual.Length > 0) Locator.Find(manual);
                 Uri uri; string feed = newsFeed.Text.Trim(); if (feed.Length > 0 && (!Uri.TryCreate(feed, UriKind.Absolute, out uri) || uri.Scheme != "https" || uri.UserInfo.Length != 0)) throw new InvalidOperationException("RSS 地址须为不包含账号信息的 HTTPS 链接。");
                 // Startup is changed only after the user clicks Save.
-                using (var key = Registry.CurrentUser.CreateSubKey(RunKey)) {
+                if (!preview) using (var key = Registry.CurrentUser.CreateSubKey(RunKey)) {
                     if (startup.Checked) key.SetValue("CodexQuotaManager", "\"" + Application.ExecutablePath + "\" --background");
                     else key.DeleteValue("CodexQuotaManager", false);
                 }
                 s.CodexPath = manual; s.RefreshSeconds = (int)seconds.Value; s.LowThreshold = (int)threshold.Value; s.LowNotify = notify.Checked;
-                s.Floating = floating.Checked; s.LocalTime = local.Checked; s.NumberIcon = number.Checked; s.TiboNews = newsEnabled.Checked; s.TiboFeedUrl = feed; s.Save(); DialogResult = DialogResult.OK; Close();
+                s.Floating = floating.Checked; s.LocalTime = local.Checked; s.NumberIcon = number.Checked; s.TiboNews = newsEnabled.Checked; s.TiboFeedUrl = feed; if (!preview) s.Save(); DialogResult = DialogResult.OK; Close();
             } catch (Exception ex) { MessageBox.Show(this, ex.Message, "设置未保存", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         }
     }
@@ -442,6 +443,7 @@ namespace CodexQuotaManager {
         readonly Settings settings; readonly QuotaClient client = new QuotaClient(); readonly CancellationTokenSource stop = new CancellationTokenSource();
         readonly NotifyIcon tray; Icon trayImage; readonly Hero hero; readonly Label accountLabel, stateLabel, updatedLabel, sourceLabel; readonly FlowLayoutPanel cards;
         readonly ComboBox windowPicker; readonly Button refresh; readonly System.Windows.Forms.Timer timer; readonly FloatingForm floating;
+        SettingsForm settingsWindow;
         Snapshot snapshot; DateTimeOffset lastSuccess, nextRefresh = DateTimeOffset.MinValue; bool healthy, busy, quitting, preview, pickerUpdating, expiryQueued, resourcesDisposed; string error = "首次查询中"; string detected = ""; string iconSignature = "";
         readonly List<string> pickerKeys = new List<string>(); readonly HashSet<string> alerted = new HashSet<string>();
         readonly NewsStore newsState = new NewsStore(); readonly NewsClient newsClient = new NewsClient();
@@ -482,13 +484,14 @@ namespace CodexQuotaManager {
             menu.Items.Add("打开配置目录", null, delegate { Directory.CreateDirectory(Settings.DataDir); Process.Start("explorer.exe", "\"" + Settings.DataDir + "\""); });
             menu.Items.Add("退出管家", null, delegate { ExitManager(); }); tray.ContextMenuStrip = menu;
             tray.MouseClick += delegate(object sender, MouseEventArgs e) { if (e.Button == MouseButtons.Left) { OpenDetails(); if (DateTimeOffset.UtcNow - lastSuccess > TimeSpan.FromSeconds(5)) { var ignored = RefreshQuota(); } } };
-            floating = new FloatingForm(settings, OpenDetails, delegate { var ignored = RefreshQuota(); }, OpenSettings, ExitManager, OpenNews);
+            floating = new FloatingForm(settings, OpenDetails, delegate { var ignored = RefreshQuota(); }, OpenSettings, ExitManager, OpenNews, SaveSettings);
             FormClosing += delegate(object sender, FormClosingEventArgs e) { if (!quitting && !preview && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); } };
             timer = new System.Windows.Forms.Timer { Interval = 1000 }; timer.Tick += delegate { UpdateVisuals(); if (!busy && DateTimeOffset.UtcNow >= nextRefresh) { var ignored = RefreshQuota(); } if (!newsBusy && settings.TiboNews && DateTimeOffset.UtcNow >= nextNews) { var ignored = RefreshNews(); } };
+            Shown += delegate { if (background) Hide(); SetFloating(); };
             if (!preview) {
                 LoadLocalState(); newsState.Load(); SystemEvents.PowerModeChanged += OnPower; SystemEvents.SessionEnding += OnSessionEnding;
                 System.Net.NetworkInformation.NetworkChange.NetworkAvailabilityChanged += OnNetwork;
-                Shown += async delegate { if (background || settings.Floating) Hide(); SetFloating(); timer.Start(); var ignored = RefreshNews(); await RefreshQuota(); };
+                Shown += async delegate { timer.Start(); var ignored = RefreshNews(); await RefreshQuota(); };
             }
             newsState.Enabled = settings.TiboNews; PublishNews();
             UpdateVisuals();
@@ -615,21 +618,27 @@ namespace CodexQuotaManager {
         void OpenSettings() {
             if (quitting) return;
             floating.HideHover();
-            using (var f = new SettingsForm(settings, detected)) {
-                // A hidden/minimized main window cannot provide a useful owner for a tray-launched dialog.
-                Form owner = Visible && WindowState != FormWindowState.Minimized ? this : floating.Visible ? (Form)floating : null;
-                if (owner != this) { f.ShowInTaskbar = true; f.StartPosition = FormStartPosition.CenterScreen; }
-                f.Shown += delegate { f.Activate(); };
-                var result = owner == null ? f.ShowDialog() : f.ShowDialog(owner);
-                if (result == DialogResult.OK) { SetFloating(); RebuildCards(); UpdateVisuals(); nextRefresh = DateTimeOffset.MinValue; nextNews = DateTimeOffset.MinValue; PublishNews(); }
+            if (settingsWindow != null && !settingsWindow.IsDisposed) {
+                settingsWindow.BringToFront(); settingsWindow.Activate(); return;
             }
+            var f = new SettingsForm(settings, detected, preview); settingsWindow = f;
+            // Modeless settings keep the floating battery enabled and draggable.
+            Form owner = Visible && WindowState != FormWindowState.Minimized ? this : floating.Visible ? (Form)floating : null;
+            if (owner != this) { f.ShowInTaskbar = true; f.StartPosition = FormStartPosition.CenterScreen; }
+            f.Shown += delegate { f.Activate(); };
+            f.FormClosed += delegate {
+                settingsWindow = null;
+                if (!quitting && f.DialogResult == DialogResult.OK) { SetFloating(); RebuildCards(); UpdateVisuals(); nextRefresh = DateTimeOffset.MinValue; nextNews = DateTimeOffset.MinValue; PublishNews(); }
+            };
+            if (owner == null) f.Show(); else f.Show(owner);
         }
         public void OpenDetails() { if (quitting) return; Show(); if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal; Activate(); if (!preview && DateTimeOffset.UtcNow - lastSuccess > TimeSpan.FromSeconds(5)) nextRefresh = DateTimeOffset.MinValue; }
-        public void ExitManager() { if (quitting) return; quitting = true; timer.Stop(); stop.Cancel(); client.Stop(); tray.Visible = false; floating.Close(); Close(); }
+        public void ExitManager() { if (quitting) return; quitting = true; timer.Stop(); stop.Cancel(); client.Stop(); tray.Visible = false; if (settingsWindow != null) settingsWindow.Close(); floating.Close(); Close(); }
         protected override void Dispose(bool disposing) {
             if (disposing && !resourcesDisposed) {
                 resourcesDisposed = true;
                 quitting = true; timer.Stop(); stop.Cancel(); client.Stop();
+                if (settingsWindow != null) settingsWindow.Close();
                 if (!preview) { SystemEvents.PowerModeChanged -= OnPower; SystemEvents.SessionEnding -= OnSessionEnding; System.Net.NetworkInformation.NetworkChange.NetworkAvailabilityChanged -= OnNetwork; }
                 tray.Dispose(); if (trayImage != null) trayImage.Dispose(); floating.Dispose(); timer.Dispose(); stop.Dispose();
             }
